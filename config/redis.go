@@ -1,9 +1,12 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type RedisCred struct {
@@ -32,12 +35,52 @@ func parseRedisCred() (RedisCred, error) {
 		port:     redis_port,
 	}, nil
 }
-func CreateRedisClient() error {
+
+// CreateRedisClient initialized the redis client required to store the queue
+func CreateRedisClient() (*redis.Client, error) {
 	redisCredentials, err := parseRedisCred()
 	if err != nil {
-		return fmt.Errorf("Failed : Error creating an Redis server")
+		return &redis.Client{}, fmt.Errorf("Failed : Error creating an Redis server")
 	}
 	slog.Info("rdis configuration", "config", redisCredentials)
+	return redis.NewClient(&redis.Options{
+		Addr:     redisCredentials.host + redisCredentials.port,
+		Password: redisCredentials.password, // no password
+		DB:       0,                         // use default DB
+		Protocol: 2,
+	}), nil
+}
+
+// functions for the redis queue ops
+
+// CRUD
+
+func CreateRedisHValue(ctx context.Context, client *redis.Client, key string, value interface{}) error {
+	_, err := client.HSet(ctx, key, value).Result()
+
+	if err != nil {
+		slog.Error("Error inserting into Redis : ", key, value)
+		return err
+	}
 	return nil
 }
 
+func GetRedisHValue(ctx context.Context, client *redis.Client, hsetKey, value string) (string, error) {
+	result, err := client.HGet(ctx, hsetKey, value).Result()
+
+	if err != nil {
+		slog.Error("Error getting into Redis : ", hsetKey, value)
+		return "", err
+	}
+	return result, nil
+}
+
+func GetRedisAllHValue(ctx context.Context, client *redis.Client, hsetKey, value string) (map[string]string, error) {
+	result, err := client.HGetAll(ctx, hsetKey).Result()
+
+	if err != nil {
+		slog.Error("Error getting into Redis : ", hsetKey, value)
+		return make(map[string]string), err
+	}
+	return result, nil
+}
