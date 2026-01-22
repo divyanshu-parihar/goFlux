@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"os"
@@ -44,10 +45,11 @@ func CreateRedisClient() (*redis.Client, error) {
 	}
 	slog.Info("rdis configuration", "config", redisCredentials)
 	return redis.NewClient(&redis.Options{
-		Addr:     redisCredentials.host + redisCredentials.port,
-		Password: redisCredentials.password, // no password
-		DB:       0,                         // use default DB
-		Protocol: 2,
+		Addr:      redisCredentials.host + redisCredentials.port,
+		Password:  redisCredentials.password, // no password
+		DB:        0,                         // use default DB
+		Protocol:  2,
+		TLSConfig: &tls.Config{},
 	}), nil
 }
 
@@ -75,11 +77,11 @@ func GetRedisHValue(ctx context.Context, client *redis.Client, hsetKey, value st
 	return result, nil
 }
 
-func GetRedisAllHValue(ctx context.Context, client *redis.Client, hsetKey, value string) (map[string]string, error) {
+func GetRedisAllHValue(ctx context.Context, client *redis.Client, hsetKey string) (map[string]string, error) {
 	result, err := client.HGetAll(ctx, hsetKey).Result()
 
 	if err != nil {
-		slog.Error("Error getting into Redis : ", hsetKey, value)
+		slog.Error("Error getting into Redis : " + hsetKey)
 		return make(map[string]string), err
 	}
 	return result, nil
